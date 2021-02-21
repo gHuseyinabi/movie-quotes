@@ -6,11 +6,13 @@ BaseURL = 'https://www.quotes.net/mquote/'
 BaseFile = 'reffrences.html'
 Space = '<br>'
 Split = '<hr>'
-REFFRENCE_LIMIT = 10000
+
+ReffrenceLimit = 10_000
+Start = 0
 
 FileStream = open(BaseFile, 'w')
 
-for i in range(3000, REFFRENCE_LIMIT):
+for i in range(Start,ReffrenceLimit):
     urlstream = urlopen('{0}{1}'.format(BaseURL,i))
     content = urlstream.read()
     urlstream.close()
