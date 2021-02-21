@@ -1,33 +1,57 @@
 from bs4 import BeautifulSoup
 import requests
-import thrading
+import threading
+import queue
+import psutil
 BaseURL = 'https://www.quotes.net/mquote/'
 BaseFile = 'reffrences.html'
 UserAgent = 'hi dont mind me im downloading movie quotes to use it offline thank'
 Space = '<br>'
 Split = '<hr>'
-ReffrenceLimit = 10_000
-Start = 0
-
+ReffrenceLimit = 20_000
+Start = 10_000
 FileStream = open(BaseFile, 'w')
-Session = requests.Session()
-Session.headers.update({'User-Agent':UserAgent})
+
+Agent = {'User-Agent':UserAgent}
 
 QuoteDict = {"class":"disp-mquote-int"}
 MovieDict = {"class":"movie-title"}
+MemoryToUse = 200*1024*1024  # 200MB
+
+
+que = []
+
+def GetRequest():
+    print("Woo")
+    global que
+    if len(que) == 0:
+        return
+    towrite = list((params.get("MovieName") + Space + params.get("Quote") + Split + params.get("Styles","") for params in que))
+    towrite = ''.join(towrite)
+    FileStream.write(towrite)
+    print(f"DONE {len(que)} ROWS")
+    que = []
 
 def Look(i):
-    urlstream = Session.get('{0}{1}'.format(BaseURL,i))
-    content = urlstream.text
-    Soup = BeautifulSoup(content)
+    Session = requests.Session()
+    Session.headers.update(Agent)
+    _ = Session.get('{0}{1}'.format(BaseURL,i))
+    del Session
+    QueueParameters = {}
+    Soup = BeautifulSoup(_.text,"html.parser")
+    del _
     if i == 0:
-        Styles = Soup.find_all('link')
-        FileStream.write('\n'.join(str(match) for match in Soup.find_all("link")))
-    Quote = Soup.find("div",QuoteDict)
-    MovieName = Soup.find("h1",MovieDict)
-    FileStream.write(str(MovieName) + Space + str(Quote) + Split)
-    print(MovieName)
-    print("Now at index {}".format(i))
-for i in range(Start,ReffrenceLimit):
-    threading.Thread(target=Look,args=(i,)).start()
+        QueueParameters["Styles"] = Soup.find_all('link').__str__()
+    QueueParameters["Quote"] = Soup.find("div",QuoteDict).__str__()
+    QueueParameters["MovieName"] = Soup.find("h1",MovieDict).__str__()
+    del Soup
+    que.append(QueueParameters)
+    del QueueParameters
 
+for i in range(Start,ReffrenceLimit):
+    if i % 20 == 0 and i > 20:
+        GetRequest()
+    threading.Thread(target=Look,args=(i,)).start()
+    print("QUEUE LENGTH IS:",len(que)) if len(que) != 0 else None
+    print(i)
+GetRequest()
